@@ -1,6 +1,6 @@
 # Brand Voice Eval
 
-Test how OpusClip's prompts (clip title / social copy / auto hook) respond to
+Test how prompts (clip title / social copy / auto hook) respond to
 a per-brand voice instruction, side-by-side against real reference outputs.
 
 ## Structure
@@ -42,7 +42,7 @@ GATEWAY_X_CALLER=<your-caller-id> npm run dev
 
 ## Models
 
-Set on the backend in `server/src/eval.ts` — same tiers as OpusClip production:
+Configured on the backend in `server/src/eval.ts`:
 
 | Prompt      | Primary                 | Fallback   |
 | ----------- | ----------------------- | ---------- |
