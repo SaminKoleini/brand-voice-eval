@@ -6,8 +6,6 @@ For each clip you add, it generates the same outputs twice — once with the sta
 
 ![Home screen: paste a website to capture a brand, with saved brands below](docs/screenshots/home.png)
 
-<sub>Screenshots use made-up example brands and sample outputs.</sub>
-
 ## What it does
 
 - **Brands** hold three voice instructions (one each for social copy, hooks and titles) plus the brand's logo, colours and one-liners.
@@ -84,7 +82,11 @@ Aim for **10 or more clips per brand** so patterns show up instead of one-off no
 
 Paste a URL and the server fetches the page and fills in the brand as a set of cards. Everything is editable, and nothing is saved until you press Create or Save.
 
-![Brand page: identity, colours, one-liners and the three voice instructions as cards](docs/screenshots/brand-dna.png)
+![Brand page generated from a website: logo, colours and one-liners as cards](docs/screenshots/brand-dna.png)
+
+The three voice cards hold the instructions the eval injects into each prompt:
+
+![Brand page showing the copy, hook and title style instructions](docs/screenshots/brand-voice.png)
 
 | Card | Where it comes from |
 | --- | --- |
