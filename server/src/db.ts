@@ -49,6 +49,20 @@ db.exec(`
   );
 `)
 
+// Brand identity columns arrived after the first release, and CREATE TABLE
+// IF NOT EXISTS won't add them to a data.db that already has the table.
+const brandColumns = new Set(
+  (db.prepare('PRAGMA table_info(brands)').all() as { name: string }[]).map((c) => c.name),
+)
+for (const [column, type] of [
+  ['website_url', "TEXT DEFAULT ''"],
+  ['logo_url', "TEXT DEFAULT ''"],
+  ['colors', "TEXT DEFAULT '[]'"],
+  ['one_liners', "TEXT DEFAULT '[]'"],
+]) {
+  if (!brandColumns.has(column)) db.exec(`ALTER TABLE brands ADD COLUMN ${column} ${type}`)
+}
+
 export function nowId(): string {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }

@@ -1,4 +1,5 @@
 import OpenAI from 'openai'
+import { connect } from 'node:net'
 
 const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://10.113.0.113:4000/openai/v1'
 const X_CALLER = process.env.GATEWAY_X_CALLER ?? 'lab-samin-eval-brand-voice'
@@ -13,6 +14,29 @@ export const gateway = new OpenAI({
   },
 })
 
+// Off the internal network the gateway's private IP just swallows packets, so
+// a request hangs until its timeout. Callers that want to fail fast probe first.
+export function assertGatewayReachable(timeoutMs = 3000): Promise<void> {
+  const { hostname, port, protocol } = new URL(GATEWAY_URL)
+  return new Promise((resolve, reject) => {
+    const socket = connect({
+      host: hostname,
+      port: Number(port) || (protocol === 'https:' ? 443 : 80),
+      timeout: timeoutMs,
+    })
+    const fail = () => {
+      socket.destroy()
+      reject(new Error(`AI gateway unreachable at ${hostname} — are you on the internal network?`))
+    }
+    socket.once('connect', () => {
+      socket.destroy()
+      resolve()
+    })
+    socket.once('timeout', fail)
+    socket.once('error', fail)
+  })
+}
+
 export type ModelId =
   | 'gemini-2.5-flash-lite'
   | 'gemini-2.5-flash'
@@ -22,12 +46,16 @@ export async function callModel(
   model: ModelId,
   prompt: string,
   maxTokens = 1024,
+  timeoutMs?: number,
 ): Promise<string> {
-  const res = await gateway.chat.completions.create({
-    model,
-    messages: [{ role: 'user', content: prompt }],
-    max_tokens: maxTokens,
-  })
+  const res = await gateway.chat.completions.create(
+    {
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: maxTokens,
+    },
+    timeoutMs ? { timeout: timeoutMs, maxRetries: 0 } : undefined,
+  )
   return res.choices[0]?.message?.content ?? ''
 }
 

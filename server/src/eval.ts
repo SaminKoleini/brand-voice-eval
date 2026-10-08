@@ -45,7 +45,7 @@ function stripCodeFence(s: string): string {
     .trim()
 }
 
-function tryParseJson<T>(raw: string): T | null {
+export function tryParseJson<T>(raw: string): T | null {
   const cleaned = stripCodeFence(raw)
   try {
     return JSON.parse(cleaned) as T

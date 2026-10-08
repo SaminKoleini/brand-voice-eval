@@ -4,8 +4,32 @@ export type Brand = {
   copy_instruction: string
   hook_instruction: string
   title_instruction: string
+  website_url: string
+  logo_url: string
+  colors: string // JSON array of hex strings
+  one_liners: string // JSON array of strings
   created_at: number
   clip_count?: number
+}
+
+export type SiteProfile = {
+  url: string
+  name: string
+  logo_url: string
+  logo_candidates: string[]
+  colors: string[]
+  one_liners: string[]
+  voice: { copy: string; hook: string; title: string } | null
+  voice_error: string
+}
+
+export function parseList(json: string | undefined): string[] {
+  try {
+    const list = JSON.parse(json || '[]')
+    return Array.isArray(list) ? list.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
+  }
 }
 
 export type ClipSummary = {
@@ -86,6 +110,18 @@ export const api = {
     }).then(j<Brand>),
   deleteBrand: (id: string) =>
     fetch(`/api/brands/${id}`, { method: 'DELETE' }).then(j),
+  // Failures here are routine (typos, sites that block bots), so surface the
+  // server's message on its own rather than the raw status + body.
+  analyzeSite: async (url: string) => {
+    const res = await fetch('/api/analyze-site', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url }),
+    })
+    const body = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(body.error ?? `request failed (${res.status})`)
+    return body as SiteProfile
+  },
 
   createClip: (brandId: string, form: FormData) =>
     fetch(`/api/brands/${brandId}/clips`, {

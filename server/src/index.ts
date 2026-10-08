@@ -8,6 +8,7 @@ import { mkdirSync, createWriteStream, existsSync } from 'node:fs'
 import { pipeline } from 'node:stream/promises'
 import { db, nowId } from './db.js'
 import { runEval } from './eval.js'
+import { analyzeSite } from './site.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const UPLOAD_DIR = join(__dirname, '..', 'uploads')
@@ -31,8 +32,44 @@ type Brand = {
   copy_instruction: string
   hook_instruction: string
   title_instruction: string
+  website_url: string
+  logo_url: string
+  colors: string
+  one_liners: string
   created_at: number
 }
+
+// website_url / logo_url end up in href and src, so nothing but http(s) is stored.
+function httpUrl(value: unknown): string {
+  try {
+    const url = new URL(String(value ?? ''))
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : ''
+  } catch {
+    return ''
+  }
+}
+
+// colors / one_liners are JSON-encoded string arrays, like reference_social_copy.
+function jsonList(value: unknown, pattern?: RegExp): string {
+  let list: unknown = value
+  if (typeof value === 'string') {
+    try {
+      list = JSON.parse(value)
+    } catch {
+      list = []
+    }
+  }
+  if (!Array.isArray(list)) return '[]'
+  return JSON.stringify(
+    list
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter((item) => item && (!pattern || pattern.test(item)))
+      .slice(0, 12),
+  )
+}
+
+const HEX_COLOR = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i
 
 type Clip = {
   id: string
@@ -62,14 +99,18 @@ app.post('/api/brands', async (req, reply) => {
   if (!body.name?.trim()) return reply.code(400).send({ error: 'name required' })
   const id = nowId()
   db.prepare(
-    `INSERT INTO brands (id, name, copy_instruction, hook_instruction, title_instruction, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO brands (id, name, copy_instruction, hook_instruction, title_instruction, website_url, logo_url, colors, one_liners, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     id,
     body.name.trim(),
     body.copy_instruction ?? '',
     body.hook_instruction ?? '',
     body.title_instruction ?? '',
+    httpUrl(body.website_url),
+    httpUrl(body.logo_url),
+    jsonList(body.colors, HEX_COLOR),
+    jsonList(body.one_liners),
     Date.now(),
   )
   return db.prepare('SELECT * FROM brands WHERE id = ?').get(id)
@@ -101,13 +142,21 @@ app.put('/api/brands/:id', async (req, reply) => {
       name = ?,
       copy_instruction = ?,
       hook_instruction = ?,
-      title_instruction = ?
+      title_instruction = ?,
+      website_url = ?,
+      logo_url = ?,
+      colors = ?,
+      one_liners = ?
      WHERE id = ?`,
   ).run(
     body.name ?? existing.name,
     body.copy_instruction ?? existing.copy_instruction,
     body.hook_instruction ?? existing.hook_instruction,
     body.title_instruction ?? existing.title_instruction,
+    body.website_url === undefined ? existing.website_url : httpUrl(body.website_url),
+    body.logo_url === undefined ? existing.logo_url : httpUrl(body.logo_url),
+    body.colors === undefined ? existing.colors : jsonList(body.colors, HEX_COLOR),
+    body.one_liners === undefined ? existing.one_liners : jsonList(body.one_liners),
     id,
   )
   return db.prepare('SELECT * FROM brands WHERE id = ?').get(id)
@@ -117,6 +166,17 @@ app.delete('/api/brands/:id', async (req) => {
   const { id } = req.params as { id: string }
   db.prepare('DELETE FROM brands WHERE id = ?').run(id)
   return { ok: true }
+})
+
+app.post('/api/analyze-site', async (req, reply) => {
+  const body = req.body as { url?: string }
+  if (!body?.url?.trim()) return reply.code(400).send({ error: 'url required' })
+  try {
+    return await analyzeSite(body.url)
+  } catch (err: any) {
+    app.log.error(err)
+    return reply.code(422).send({ error: err?.message ?? 'analyze_failed' })
+  }
 })
 
 app.post('/api/brands/:id/clips', async (req, reply) => {
